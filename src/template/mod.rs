@@ -1,7 +1,5 @@
-use git2::Repository;
 use std::fs;
 use std::path::PathBuf;
-use tempfile::TempDir;
 
 use crate::config::{TEMPLATE_CATEGORIES, TEMPLATE_REPO_URL};
 
@@ -17,8 +15,30 @@ impl TemplateManager {
             .path()
             .to_path_buf();
 
+        // Configure Git to use HTTPS with PAT
+        let mut callbacks = git2::RemoteCallbacks::new();
+        callbacks.credentials(|_url, username_from_url, _allowed_types| {
+            // Get the PAT from environment variable
+            let pat = std::env::var("GITHUB_TOKEN").map_err(|_| {
+                git2::Error::new(
+                    git2::ErrorCode::Auth,
+                    git2::ErrorClass::Http,
+                    "GITHUB_TOKEN environment variable not set",
+                )
+            })?;
+
+            git2::Cred::userpass_plaintext(username_from_url.unwrap_or("git"), &pat)
+        });
+
+        // Set up fetch options with the callbacks
+        let mut fetch_options = git2::FetchOptions::new();
+        fetch_options.remote_callbacks(callbacks);
+
         // Clone the repository
-        Repository::clone(TEMPLATE_REPO_URL, &repo_path).map_err(|e| {
+        let mut builder = git2::build::RepoBuilder::new();
+        builder.fetch_options(fetch_options);
+
+        builder.clone(TEMPLATE_REPO_URL, &repo_path).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to clone repository: {}", e),
