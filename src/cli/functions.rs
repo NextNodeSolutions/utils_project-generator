@@ -2,11 +2,26 @@ use inquire::Text;
 
 use crate::utils::validation;
 
-pub fn select_template(templates: Vec<String>) -> Option<String> {
-    let selection = inquire::Select::new("Select a template :", templates).prompt();
+pub fn select_template(templates: Vec<(String, String)>) -> Option<(String, String)> {
+    let options: Vec<String> = templates
+        .iter()
+        .map(|(category, name)| format!("{} ({})", name, category))
+        .collect();
+
+    let selection = inquire::Select::new("Select a template:", options).prompt();
 
     match selection {
-        Ok(selected_template) => Some(selected_template),
+        Ok(selected) => {
+            // Extract the template name and category from the selection
+            let parts: Vec<&str> = selected.split(" (").collect();
+            if parts.len() == 2 {
+                let name = parts[0].to_string();
+                let category = parts[1].trim_end_matches(')').to_string();
+                Some((category, name))
+            } else {
+                None
+            }
+        }
         Err(_) => None,
     }
 }

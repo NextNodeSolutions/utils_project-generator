@@ -3,21 +3,27 @@ use std::path::Path;
 
 mod functions;
 
-use crate::config::{APPS_PATH, PACKAGE_ROOT_PATH, TEMPLATES_PATH};
+use crate::config::{APPS_PATH, PACKAGE_ROOT_PATH};
 use crate::generate::project_generator;
+use crate::template::TemplateManager;
 use crate::utils::{context, error, strings};
 
 pub fn interact() -> std::io::Result<()> {
-    let template_path = Path::new(&PACKAGE_ROOT_PATH).join(TEMPLATES_PATH);
-
-    let templates = project_generator::list_templates(&template_path).unwrap_or_else(|err| {
-        error::print_error_and_exit_with_error("An error occurred while listing templates", &err)
-    });
-    let selected_template = functions::select_template(templates).unwrap_or_else(|| {
-        error::print_error_and_exit("An error occurred while selecting a template");
+    // Initialize template manager and clone the repository
+    let template_manager = TemplateManager::new().unwrap_or_else(|err| {
+        error::print_error_and_exit_with_error("Failed to initialize template manager", &err)
     });
 
-    let template_path = template_path.join(&selected_template);
+    // List available templates
+    let templates = template_manager.list_templates().unwrap_or_else(|err| {
+        error::print_error_and_exit_with_error("Failed to list templates", &err)
+    });
+
+    // Select template
+    let (category, template_name) = functions::select_template(templates)
+        .unwrap_or_else(|| error::print_error_and_exit("Failed to select template"));
+
+    let template_path = template_manager.get_template_path(&category, &template_name);
 
     let unique_keys = strings::extract_unique_keys(&template_path).unwrap_or_else(|err| {
         error::print_error_and_exit_with_error(
@@ -25,8 +31,6 @@ pub fn interact() -> std::io::Result<()> {
             &err,
         )
     });
-
-    println!("unique_keys: {:?}", unique_keys);
 
     let project_name = functions::prompt_for_variable(&"project_name").unwrap_or_else(|| {
         error::print_error_and_exit("An error occurred while entering project name")
@@ -47,8 +51,8 @@ pub fn interact() -> std::io::Result<()> {
         .join(&project_name);
 
     println!(
-        "Generating project '{}' with template '{}'",
-        project_name, selected_template
+        "Generating project '{}' with template '{}' from category '{}'",
+        project_name, template_name, category
     );
 
     project_generator::generate_project(&template_path, &project_path).unwrap_or_else(|err| {
