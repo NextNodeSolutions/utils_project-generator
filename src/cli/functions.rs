@@ -1,0 +1,40 @@
+use inquire::Text;
+
+use crate::utils::validation;
+
+pub fn select_template(templates: Vec<(String, String)>) -> Option<(String, String)> {
+    let options: Vec<String> = templates
+        .iter()
+        .map(|(category, name)| format!("{} ({})", name, category))
+        .collect();
+
+    let selection = inquire::Select::new("Select a template:", options).prompt();
+
+    match selection {
+        Ok(selected) => {
+            // Extract the template name and category from the selection
+            let parts: Vec<&str> = selected.split(" (").collect();
+            if parts.len() == 2 {
+                let name = parts[0].to_string();
+                let category = parts[1].trim_end_matches(')').to_string();
+                Some((category, name))
+            } else {
+                None
+            }
+        }
+        Err(_) => None,
+    }
+}
+
+pub fn prompt_for_variable(variable_name: &str) -> Option<String> {
+    let prompt = format!("Enter value for {}:", variable_name);
+
+    if variable_name == "project_name" {
+        return Text::new(&prompt)
+            .with_validator(validation::validate_project_name)
+            .prompt()
+            .ok();
+    }
+
+    Text::new(&prompt).prompt().ok()
+}
