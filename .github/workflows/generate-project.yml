@@ -1,0 +1,30 @@
+name: Generate Project
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_file:
+        description: 'Path to the configuration file'
+        required: true
+        default: 'config.yaml'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      
+      - name: Build project generator
+        run: cargo build --release
+      
+      - name: Generate project
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./target/release/project-generator-cli --config ${{ github.event.inputs.config_file }} 
