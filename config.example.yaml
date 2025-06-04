@@ -1,0 +1,10 @@
+name: "my-awesome-project"
+project_name: "my-awesome-project"
+description: "A new awesome project"
+author: "John Doe"
+github_token: "your-github-token"  # Optional, required only if create_repo is true
+create_repo: true  # Set to true to create a new GitHub repository
+additional_vars:
+  version: "1.0.0"
+  license: "MIT"
+  node_version: "18.x" 
