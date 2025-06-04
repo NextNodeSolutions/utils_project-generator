@@ -13,6 +13,12 @@ pub struct Replacement {
     pub name: String,
     pub key: String,
     pub value: String,
+    #[serde(rename = "type", default = "default_type")]
+    pub type_: String,
+}
+
+fn default_type() -> String {
+    "string".to_string()
 }
 
 #[derive(serde::Deserialize)]
