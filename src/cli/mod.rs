@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-mod functions;
+pub mod functions;
 
 use crate::config::{CREATION_PATH, PACKAGE_ROOT_PATH};
 use crate::generate::project_generator;
@@ -30,20 +30,30 @@ pub fn interact() -> std::io::Result<()> {
         error::print_error_and_exit("An error occurred while entering project name")
     });
 
-    // Initialize variables with project name
-    let mut variables = HashMap::from([("name".to_string(), project_name.to_string())]);
+    // Get package name
+    let package_name = functions::prompt_for_variable(&"name").unwrap_or_else(|| {
+        error::print_error_and_exit("An error occurred while entering package name")
+    });
+
+    // Initialize variables with both names
+    let mut variables = HashMap::from([
+        ("project_name".to_string(), project_name.to_string()),
+        ("name".to_string(), package_name.to_string()),
+    ]);
 
     // Try to get additional variables from template config
     match strings::extract_unique_keys(&template_path) {
         Ok(unique_keys) => {
             for key in &unique_keys {
-                let value = functions::prompt_for_variable(&key).unwrap_or_else(|| {
-                    error::print_error_and_exit(&format!(
-                        "An error occurred while entering {}",
-                        &key
-                    ))
-                });
-                variables.insert(key.to_string(), value);
+                if key != "project_name" && key != "name" {
+                    let value = functions::prompt_for_variable(&key).unwrap_or_else(|| {
+                        error::print_error_and_exit(&format!(
+                            "An error occurred while entering {}",
+                            &key
+                        ))
+                    });
+                    variables.insert(key.to_string(), value);
+                }
             }
         }
         Err(err) => {

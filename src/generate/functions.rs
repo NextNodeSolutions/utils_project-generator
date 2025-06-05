@@ -5,8 +5,8 @@ use crate::config::Replacement;
 use crate::utils::context;
 
 fn convert_value_to_json(value: &str, type_: &str) -> Value {
-    println!("DEBUG - Input value: '{}'", value);
-    println!("DEBUG - Type: '{}'", type_);
+    context::debug_print(&format!("DEBUG - Input value: '{}'", value));
+    context::debug_print(&format!("DEBUG - Type: '{}'", type_));
 
     match type_ {
         "array" => {
@@ -14,7 +14,7 @@ fn convert_value_to_json(value: &str, type_: &str) -> Value {
                 .split(',')
                 .map(|s| Value::String(s.trim().to_string()))
                 .collect();
-            println!("DEBUG - Array values: {:?}", array_values);
+            context::debug_print(&format!("DEBUG - Array values: {:?}", array_values));
             Value::Array(array_values)
         }
         _ => Value::String(value.to_string()),

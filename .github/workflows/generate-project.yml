@@ -3,10 +3,20 @@ name: Generate Project
 on:
   workflow_dispatch:
     inputs:
-      config_file:
-        description: 'Path to the configuration file'
+      project_config:
+        description: 'Project configuration in YAML format'
         required: true
-        default: 'config.yaml'
+        type: string
+        default: |
+          name: "my-awesome-project"
+          project_name: "my-awesome-project"
+          description: "A new awesome project"
+          author: "John Doe"
+          create_repo: true
+          additional_vars:
+            version: "1.0.0"
+            license: "MIT"
+            node_version: "18.x"
 
 jobs:
   generate:
@@ -23,8 +33,12 @@ jobs:
       - name: Build project generator
         run: cargo build --release
       
+      - name: Create config file
+        run: |
+          echo "${{ github.event.inputs.project_config }}" > config.yaml
+      
       - name: Generate project
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./target/release/project-generator-cli --config ${{ github.event.inputs.config_file }} 
+          ./target/release/project-generator-cli config.yaml 

@@ -1,3 +1,5 @@
+pub mod file_config;
+
 pub const PACKAGE_ROOT_PATH: &str = env!("CARGO_MANIFEST_DIR");
 pub const CREATION_PATH: &str = "../";
 pub const TEMPLATE_REPO_URL: &str =
