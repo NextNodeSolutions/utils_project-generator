@@ -39,8 +39,26 @@ fn main() {
     });
 
     // Get template path
-    let (category, template_name) = if let (Some(cat), Some(tmpl)) = (args.category, args.template)
-    {
+    let (category, template_name) = if let Some(config_path) = &args.config {
+        // Try to get template info from config file
+        match file_config::from_file(config_path) {
+            Ok(config) => {
+                // Set variables from config
+                project_generator_cli::utils::context::set_variables(config.to_variables());
+
+                // Get template info from config
+                config.get_template_info().unwrap_or_else(|| {
+                    project_generator_cli::utils::error::print_error_and_exit(
+                        "template_category and template_name are required in configuration file",
+                    )
+                })
+            }
+            Err(e) => {
+                eprintln!("Error reading configuration file: {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else if let (Some(cat), Some(tmpl)) = (args.category, args.template) {
         (cat, tmpl)
     } else {
         // List available templates
@@ -59,19 +77,8 @@ fn main() {
 
     let template_path = template_manager.get_template_path(&category, &template_name);
 
-    // Read configuration file if provided
-    if let Some(config_path) = args.config {
-        match file_config::from_file(config_path) {
-            Ok(variables) => {
-                project_generator_cli::utils::context::set_variables(variables);
-            }
-            Err(e) => {
-                eprintln!("Error reading configuration file: {}", e);
-                std::process::exit(1);
-            }
-        }
-    } else {
-        // If no config file, use interactive mode
+    // If no config file was provided, use interactive mode
+    if args.config.is_none() {
         match project_generator_cli::cli::interact() {
             Ok(_) => println!("Project generated successfully"),
             Err(e) => eprintln!("Error generating project: {}", e),
@@ -83,7 +90,7 @@ fn main() {
     let project_name = project_generator_cli::utils::context::get_variable("project_name")
         .unwrap_or_else(|| {
             project_generator_cli::utils::error::print_error_and_exit(
-                "project_name is required in configuration",
+                "project_name is required in configuration file",
             )
         });
 
