@@ -10,10 +10,11 @@ pub const TEMPLATE_CONFIG_FILE: &str = "template_config.json";
 pub const EXCLUDED_DIRS: &[&str] = &["node_modules", ".next", ".turbo", "dist", "build", "out"];
 pub const EXCLUDED_FILES: &[&str] = &[TEMPLATE_CONFIG_FILE];
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(Debug, serde::Deserialize)]
 pub struct Replacement {
     pub name: String,
     pub key: String,
+    #[allow(dead_code)]
     pub value: String,
     #[serde(rename = "type", default = "default_type")]
     pub type_: String,

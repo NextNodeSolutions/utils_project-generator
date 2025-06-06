@@ -2,7 +2,6 @@ use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::process::Command;
-use std::string::String;
 
 use crate::config::TemplateJson;
 use crate::generate::file_operations;
@@ -24,42 +23,20 @@ pub fn generate_project(template_path: &Path, project_path: &Path) -> std::io::R
 
     let config = strings::read_template_config(template_path)?;
 
-    match apply_template_config(&project_path, &config) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Error::new(
-            ErrorKind::NotFound,
-            format!("Error updating package.json : {}", e),
-        )),
-    }
+    apply_template_config(&project_path, &config)?;
+    Ok(())
 }
 
 fn apply_template_config(project_path: &Path, config: &TemplateJson) -> std::io::Result<()> {
     for file in config {
         for file_to_replace in &file.files_to_replace {
             let file_path = project_path.join(&file_to_replace);
-            match file_operations::replace_in_file(&file_path, &file.replacements) {
-                Ok(_) => (),
-                Err(e) => println!("Error updating file {}: {}", file_to_replace, e),
+            if let Err(e) = file_operations::replace_in_file(&file_path, &file.replacements) {
+                println!("Error updating file {}: {}", file_to_replace, e);
             }
         }
     }
-
     Ok(())
-}
-
-pub fn list_templates(templates_path: &Path) -> std::io::Result<Vec<String>> {
-    let templates = fs::read_dir(templates_path);
-
-    if templates.is_err() {
-        return Err(templates.err().unwrap());
-    }
-
-    let mut template_names = Vec::new();
-    for template in templates.unwrap() {
-        template_names.push(template?.file_name().to_string_lossy().to_string());
-    }
-    template_names.sort();
-    Ok(template_names)
 }
 
 pub fn install_dependencies(project_path: &Path) -> std::io::Result<()> {
@@ -74,6 +51,5 @@ pub fn install_dependencies(project_path: &Path) -> std::io::Result<()> {
             "Failed to install dependencies",
         ));
     }
-
     Ok(())
 }
