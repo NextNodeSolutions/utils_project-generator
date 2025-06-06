@@ -1,3 +1,5 @@
+use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -25,20 +27,45 @@ impl FileConfig {
 
     pub fn to_variables(&self) -> std::collections::HashMap<String, String> {
         let mut vars = self.additional_vars.clone();
+
+        // Add required variables in specific order
         vars.insert("project_name".to_string(), self.project_name.clone());
         vars.insert("name".to_string(), self.name.clone());
-        vars
+
+        // Sort variables according to template_config.json
+        let mut sorted_vars = HashMap::new();
+
+        // First add required variables in specific order
+        if let Some(project_name) = vars.remove("project_name") {
+            sorted_vars.insert("project_name".to_string(), project_name);
+        }
+        if let Some(name) = vars.remove("name") {
+            sorted_vars.insert("name".to_string(), name);
+        }
+
+        // Then add remaining variables in alphabetical order
+        let mut remaining_keys: Vec<_> = vars.keys().collect();
+        remaining_keys.sort();
+        for key in remaining_keys {
+            if let Some(value) = vars.get(key) {
+                sorted_vars.insert(key.clone(), value.clone());
+            }
+        }
+
+        sorted_vars
     }
 }
 
-pub fn from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig, Box<dyn std::error::Error>> {
-    let content = fs::read_to_string(path)?;
+pub fn from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig> {
+    let content = fs::read_to_string(path.as_ref())
+        .with_context(|| format!("Failed to read config file: {}", path.as_ref().display()))?;
 
     // Try YAML first, then JSON
     if let Ok(config) = serde_yaml::from_str(&content) {
         Ok(config)
     } else {
-        let config: FileConfig = serde_json::from_str(&content)?;
+        let config: FileConfig = serde_json::from_str(&content)
+            .with_context(|| format!("Failed to parse config file: {}", path.as_ref().display()))?;
         Ok(config)
     }
 }

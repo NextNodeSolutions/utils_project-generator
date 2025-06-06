@@ -4,11 +4,11 @@ use serde_json::json;
 use std::fs;
 
 pub async fn trigger_workflow(config_path: &str, token: &str) -> Result<()> {
-    // Lire le contenu du fichier de config
+    // Read config file content
     let config_content = fs::read_to_string(config_path)
         .with_context(|| format!("Failed to read config file: {}", config_path))?;
 
-    // Construire les headers
+    // Build headers
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
@@ -21,7 +21,7 @@ pub async fn trigger_workflow(config_path: &str, token: &str) -> Result<()> {
             .context("Failed to create accept header")?,
     );
 
-    // Construire le body de la requête
+    // Build request body
     let body = json!({
         "ref": "main",
         "inputs": {
@@ -29,7 +29,7 @@ pub async fn trigger_workflow(config_path: &str, token: &str) -> Result<()> {
         }
     });
 
-    // Faire l'appel à l'API GitHub
+    // Make GitHub API call
     let client = reqwest::Client::new();
     let response = client
         .post("https://api.github.com/repos/{owner}/{repo}/actions/workflows/generate-project.yml/dispatches")
