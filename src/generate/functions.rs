@@ -4,9 +4,9 @@ use serde_json::{Map, Value};
 use crate::config::Replacement;
 use crate::utils::context;
 
-fn convert_value_to_json(value: &str, type_: &str) -> Value {
-    println!("DEBUG - Input value: '{}'", value);
-    println!("DEBUG - Type: '{}'", type_);
+pub fn convert_value_to_json(value: &str, type_: &str) -> Value {
+    context::debug_print(&format!("DEBUG - Input value: '{}'", value));
+    context::debug_print(&format!("DEBUG - Type: '{}'", type_));
 
     match type_ {
         "array" => {
@@ -14,7 +14,7 @@ fn convert_value_to_json(value: &str, type_: &str) -> Value {
                 .split(',')
                 .map(|s| Value::String(s.trim().to_string()))
                 .collect();
-            println!("DEBUG - Array values: {:?}", array_values);
+            context::debug_print(&format!("DEBUG - Array values: {:?}", array_values));
             Value::Array(array_values)
         }
         _ => Value::String(value.to_string()),
@@ -62,17 +62,4 @@ pub fn update_existing_values(
             }
         }
     }
-}
-
-pub fn replace_variables(content: &str, replacements: &[Replacement]) -> String {
-    let mut new_content = content.to_string();
-    for replacement in replacements {
-        if let Some(value) = context::get_variable(&replacement.name) {
-            let template_var = format!("{{{{{}}}}}", replacement.name);
-            let json_value = convert_value_to_json(&value, &replacement.type_);
-            let replacement_value = serde_json::to_string(&json_value).unwrap_or_else(|_| value);
-            new_content = new_content.replace(&template_var, &replacement_value);
-        }
-    }
-    new_content
 }

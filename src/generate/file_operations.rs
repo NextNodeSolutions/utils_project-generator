@@ -65,6 +65,19 @@ fn replace_in_text_file(
     content: &str,
     replacements: &[Replacement],
 ) -> io::Result<()> {
-    let new_content = functions::replace_variables(content, replacements);
+    let mut new_content = content.to_string();
+
+    for replacement in replacements {
+        if let Some(value) = crate::utils::context::get_variable(&replacement.name) {
+            let json_value = functions::convert_value_to_json(&value, &replacement.type_);
+            let formatted_value = serde_json::to_string(&json_value).unwrap_or_else(|_| value);
+
+            new_content =
+                new_content.replace(&format!("{{{{{}}}}}", replacement.name), &formatted_value);
+
+            new_content = new_content.replace(&replacement.key, &formatted_value);
+        }
+    }
+
     fs::write(file_path, new_content)
 }

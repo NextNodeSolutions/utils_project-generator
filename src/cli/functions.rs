@@ -29,12 +29,15 @@ pub fn select_template(templates: Vec<(String, String)>) -> Option<(String, Stri
 pub fn prompt_for_variable(variable_name: &str) -> Option<String> {
     let prompt = format!("Enter value for {}:", variable_name);
 
-    if variable_name == "project_name" {
-        return Text::new(&prompt)
+    match variable_name {
+        "project_name" => Text::new(&prompt)
             .with_validator(validation::validate_project_name)
             .prompt()
-            .ok();
+            .ok(),
+        "name" => Text::new(&prompt)
+            .with_validator(validation::validate_package_name)
+            .prompt()
+            .ok(),
+        _ => Text::new(&prompt).prompt().ok(),
     }
-
-    Text::new(&prompt).prompt().ok()
 }

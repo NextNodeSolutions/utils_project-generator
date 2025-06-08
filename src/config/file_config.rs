@@ -1,48 +1,71 @@
-use serde::{Deserialize, Serialize};
+use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(serde::Deserialize)]
 pub struct FileConfig {
-    pub name: String,
-    pub project_name: String,
-    pub description: String,
-    pub author: String,
-    pub github_token: Option<String>,
-    pub create_repo: bool,
     #[serde(default)]
+    pub project_name: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub template_category: Option<String>,
+    #[serde(default)]
+    pub template_name: Option<String>,
+    #[serde(flatten)]
     pub additional_vars: std::collections::HashMap<String, String>,
 }
 
 impl FileConfig {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        let content = fs::read_to_string(path)?;
-
-        // Try YAML first, then JSON
-        if let Ok(config) = serde_yaml::from_str(&content) {
-            Ok(config)
-        } else {
-            let config: FileConfig = serde_json::from_str(&content)?;
-            Ok(config)
+    pub fn get_template_info(&self) -> Option<(String, String)> {
+        match (&self.template_category, &self.template_name) {
+            (Some(category), Some(name)) => Some((category.clone(), name.clone())),
+            _ => None,
         }
     }
 
-    pub fn validate(&self) -> Result<(), String> {
-        if self.name.is_empty() {
-            return Err("name is required".to_string());
+    pub fn to_variables(&self) -> std::collections::HashMap<String, String> {
+        let mut vars = self.additional_vars.clone();
+
+        // Add required variables in specific order
+        vars.insert("project_name".to_string(), self.project_name.clone());
+        vars.insert("name".to_string(), self.name.clone());
+
+        // Sort variables according to template_config.json
+        let mut sorted_vars = HashMap::new();
+
+        // First add required variables in specific order
+        if let Some(project_name) = vars.remove("project_name") {
+            sorted_vars.insert("project_name".to_string(), project_name);
         }
-        if self.project_name.is_empty() {
-            return Err("project_name is required".to_string());
+        if let Some(name) = vars.remove("name") {
+            sorted_vars.insert("name".to_string(), name);
         }
-        if self.description.is_empty() {
-            return Err("description is required".to_string());
+
+        // Then add remaining variables in alphabetical order
+        let mut remaining_keys: Vec<_> = vars.keys().collect();
+        remaining_keys.sort();
+        for key in remaining_keys {
+            if let Some(value) = vars.get(key) {
+                sorted_vars.insert(key.clone(), value.clone());
+            }
         }
-        if self.author.is_empty() {
-            return Err("author is required".to_string());
-        }
-        if self.create_repo && self.github_token.is_none() {
-            return Err("github_token is required when create_repo is true".to_string());
-        }
-        Ok(())
+
+        sorted_vars
+    }
+}
+
+pub fn from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig> {
+    let content = fs::read_to_string(path.as_ref())
+        .with_context(|| format!("Failed to read config file: {}", path.as_ref().display()))?;
+
+    // Try YAML first, then JSON
+    if let Ok(config) = serde_yaml::from_str(&content) {
+        Ok(config)
+    } else {
+        let config: FileConfig = serde_json::from_str(&content)
+            .with_context(|| format!("Failed to parse config file: {}", path.as_ref().display()))?;
+        Ok(config)
     }
 }
