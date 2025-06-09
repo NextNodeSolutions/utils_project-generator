@@ -43,22 +43,7 @@ pub fn get_template_info(
     }
 }
 
-pub fn interact() -> Result<()> {
-    // Initialize template manager and clone the repository
-    let template_manager =
-        TemplateManager::new().with_context(|| "Failed to initialize template manager")?;
-
-    // List available templates
-    let templates = template_manager
-        .list_templates()
-        .with_context(|| "Failed to list templates")?;
-
-    // Select template
-    let (category, template_name) = functions::select_template(templates)
-        .ok_or_else(|| anyhow::anyhow!("Failed to select template"))?;
-
-    let template_path = template_manager.get_template_path(&category, &template_name);
-
+pub fn interact(template_path: &Path) -> Result<()> {
     // Get project name first
     let project_name = functions::prompt_for_variable("project_name")
         .ok_or_else(|| anyhow::anyhow!("An error occurred while entering project name"))?;
@@ -74,7 +59,7 @@ pub fn interact() -> Result<()> {
     ]);
 
     // Try to get additional variables from template config
-    match strings::extract_unique_keys(&template_path) {
+    match strings::extract_unique_keys(template_path) {
         Ok(unique_keys) => {
             for key in &unique_keys {
                 if key != "project_name" && key != "name" {
@@ -98,11 +83,12 @@ pub fn interact() -> Result<()> {
         .join(&project_name);
 
     println!(
-        "Generating project '{}' with template '{}' from category '{}'",
-        project_name, template_name, category
+        "Generating project '{}' with template '{}'",
+        project_name,
+        template_path.file_name().unwrap().to_string_lossy()
     );
 
-    project_generator::generate_project(&template_path, &project_path)
+    project_generator::generate_project(template_path, &project_path)
         .with_context(|| "An error occurred while generating the project")?;
 
     project_generator::install_dependencies(&project_path)

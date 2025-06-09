@@ -5,8 +5,8 @@ pub mod file_operations;
 pub mod functions;
 pub mod project_generator;
 
-pub fn handle_interactive_mode(_template_path: &Path) -> Result<()> {
-    match crate::cli::interact() {
+pub fn handle_interactive_mode(template_path: &Path) -> Result<()> {
+    match crate::cli::interact(template_path) {
         Ok(_) => {
             println!("Project generated successfully");
             Ok(())

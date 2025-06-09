@@ -1,7 +1,7 @@
 use crate::config::{Replacement, EXCLUDED_DIRS, EXCLUDED_FILES};
 
 use indexmap::IndexMap;
-use serde_json::{self, Map, Value};
+use serde_json::{self, Value};
 use std::path::Path;
 use std::{fs, io};
 
@@ -45,8 +45,15 @@ pub fn replace_in_file(file_path: &Path, replacements: &[Replacement]) -> io::Re
 }
 
 fn write_json_to_file(file_path: &Path, ordered_map: IndexMap<String, Value>) -> io::Result<()> {
-    let new_json: Map<String, Value> = ordered_map.into_iter().collect();
-    fs::write(file_path, serde_json::to_string_pretty(&new_json)?)
+    println!("DEBUG - Before serialization - Keys order:");
+    for (i, key) in ordered_map.keys().enumerate() {
+        println!("DEBUG - Key {}: {}", i, key);
+    }
+
+    let json_str = serde_json::to_string_pretty(&ordered_map)?;
+    println!("DEBUG - Serialized JSON:\n{}", json_str);
+
+    fs::write(file_path, json_str)
 }
 
 fn replace_in_json_file(
@@ -54,7 +61,7 @@ fn replace_in_json_file(
     content: &str,
     replacements: &[Replacement],
 ) -> io::Result<()> {
-    let template_json: Map<String, Value> = serde_json::from_str(content)?;
+    let template_json: IndexMap<String, Value> = serde_json::from_str(content)?;
     let mut ordered_map = functions::create_ordered_map(&template_json, replacements);
     functions::update_existing_values(&mut ordered_map, replacements);
     write_json_to_file(file_path, ordered_map)
