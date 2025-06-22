@@ -39,6 +39,6 @@ jobs:
       
       - name: Generate project
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GENERATE_GITHUB_TOKEN }}
         run: |
           ./target/release/project-generator-cli --config config.yaml 
