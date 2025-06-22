@@ -41,4 +41,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./target/release/project-generator-cli config.yaml 
+          ./target/release/project-generator-cli --config config.yaml 
