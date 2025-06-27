@@ -2,6 +2,7 @@ use std::io::{Error, ErrorKind, Result};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use crate::utils::context;
 
 #[derive(serde::Deserialize)]
 pub struct FileConfig {
@@ -20,12 +21,23 @@ pub struct FileConfig {
 impl FileConfig {
     pub fn get_template_info(&self) -> Option<(String, String)> {
         match (&self.template_category, &self.template_name) {
-            (Some(category), Some(name)) => Some((category.clone(), name.clone())),
-            _ => None,
+            (Some(category), Some(name)) => {
+                context::debug_print(&format!("Template info: category='{}', name='{}'", category, name));
+                Some((category.clone(), name.clone()))
+            },
+            _ => {
+                context::debug_print("Template info not found: missing category or name");
+                None
+            }
         }
     }
 
     pub fn to_variables(&self) -> std::collections::HashMap<String, String> {
+        context::debug_print("Converting config to variables");
+        context::debug_print(&format!("Project name: '{}'", self.project_name));
+        context::debug_print(&format!("Package name: '{}'", self.name));
+        context::debug_print(&format!("Additional variables: {:?}", self.additional_vars));
+        
         let mut vars = self.additional_vars.clone();
 
         // Add required variables in specific order
@@ -52,20 +64,47 @@ impl FileConfig {
             }
         }
 
+        context::debug_print(&format!("Final variables: {:?}", sorted_vars));
         sorted_vars
     }
 }
 
 pub fn from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig> {
-    let content = fs::read_to_string(path.as_ref())
+    let path_ref = path.as_ref();
+    context::debug_print(&format!("Reading config file: {}", path_ref.display()));
+    
+    let content = fs::read_to_string(path_ref)
         .map_err(|e| Error::new(ErrorKind::InvalidData, format!("Failed to read config file: {}", e)))?;
 
+    context::debug_print(&format!("Config file size: {} bytes", content.len()));
+
+    // Check if file is empty
+    if content.trim().is_empty() {
+        context::debug_print("ERROR: Configuration file is empty");
+        return Err(Error::new(
+            ErrorKind::InvalidData, 
+            "Configuration file is empty. Please add configuration content."
+        ));
+    }
+
     // Try YAML first, then JSON
-    if let Ok(config) = serde_yaml::from_str(&content) {
+    context::debug_print("Attempting YAML parsing");
+    if let Ok(config) = serde_yaml::from_str::<FileConfig>(&content) {
+        context::debug_print("Successfully parsed YAML config");
         Ok(config)
     } else {
+        context::debug_print("YAML parsing failed, attempting JSON parsing");
         let config: FileConfig = serde_json::from_str(&content)
-            .map_err(|e| Error::new(ErrorKind::InvalidData, format!("Failed to parse config file: {}", e)))?;
+            .map_err(|e| {
+                let error_msg = if content.trim().is_empty() {
+                    "Configuration file is empty".to_string()
+                } else {
+                    format!("Failed to parse config file (neither YAML nor JSON): {}", e)
+                };
+                context::debug_print(&format!("ERROR: {}", error_msg));
+                Error::new(ErrorKind::InvalidData, error_msg)
+            })?;
+        context::debug_print("Successfully parsed JSON config");
         Ok(config)
     }
 }
