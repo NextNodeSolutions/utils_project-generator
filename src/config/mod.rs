@@ -2,8 +2,9 @@ pub mod file_config;
 
 pub const PACKAGE_ROOT_PATH: &str = env!("CARGO_MANIFEST_DIR");
 pub const CREATION_PATH: &str = "../";
-pub const TEMPLATE_REPO_URL: &str =
-    "https://github.com/NextNodeSolutions/utils_project-templates.git";
+pub const REPO_URL: &str = "https://github.com/NextNodeSolutions";
+
+pub const TEMPLATE_REPO_URL: &str = "/utils_project-templates.git";
 pub const TEMPLATE_CATEGORIES: &[&str] = &["apps", "packages", "utils"];
 
 pub const TEMPLATE_CONFIG_FILE: &str = "template_config.json";

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use std::io::{Error, ErrorKind, Result};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -11,6 +11,8 @@ use crate::generate::project_generator;
 use crate::template::TemplateManager;
 use crate::utils::{context, strings};
 
+pub use functions::prompt_for_repo_name;
+
 pub fn get_template_info(
     args: &Args,
     template_manager: &TemplateManager,
@@ -18,14 +20,15 @@ pub fn get_template_info(
     if let Some(config_path) = &args.config {
         // Try to get template info from config file
         let config = file_config::from_file(config_path)
-            .with_context(|| format!("Failed to read config file: {}", config_path.display()))?;
+            .map_err(|e| Error::new(ErrorKind::InvalidData, format!("Failed to read config file: {}", e)))?;
 
         // Set variables from config
         context::set_variables(config.to_variables());
 
         // Get template info from config
         config.get_template_info().ok_or_else(|| {
-            anyhow::anyhow!(
+            Error::new(
+                ErrorKind::InvalidData,
                 "template_category and template_name are required in configuration file"
             )
         })
@@ -35,22 +38,22 @@ pub fn get_template_info(
         // List available templates
         let templates = template_manager
             .list_templates()
-            .with_context(|| "Failed to list templates")?;
+            .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to list templates: {}", e)))?;
 
         // Select template
         functions::select_template(templates)
-            .ok_or_else(|| anyhow::anyhow!("Failed to select template"))
+            .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Failed to select template"))
     }
 }
 
 pub fn interact(template_path: &Path) -> Result<()> {
     // Get project name first
     let project_name = functions::prompt_for_variable("project_name")
-        .ok_or_else(|| anyhow::anyhow!("An error occurred while entering project name"))?;
+        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "An error occurred while entering project name"))?;
 
     // Get package name
     let package_name = functions::prompt_for_variable("name")
-        .ok_or_else(|| anyhow::anyhow!("An error occurred while entering package name"))?;
+        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "An error occurred while entering package name"))?;
 
     // Initialize variables with both names
     let mut variables = HashMap::from([
@@ -64,7 +67,7 @@ pub fn interact(template_path: &Path) -> Result<()> {
             for key in &unique_keys {
                 if key != "project_name" && key != "name" {
                     let value = functions::prompt_for_variable(key).ok_or_else(|| {
-                        anyhow::anyhow!("An error occurred while entering {}", key)
+                        Error::new(ErrorKind::InvalidInput, format!("An error occurred while entering {}", key))
                     })?;
                     variables.insert(key.to_string(), value);
                 }
@@ -89,10 +92,11 @@ pub fn interact(template_path: &Path) -> Result<()> {
     );
 
     project_generator::generate_project(template_path, &project_path)
-        .with_context(|| "An error occurred while generating the project")?;
+        .map_err(|e| Error::new(ErrorKind::Other, format!("An error occurred while generating the project: {}", e)))?;
 
     project_generator::install_dependencies(&project_path)
-        .with_context(|| "An error occurred while installing dependencies")?;
+        .map_err(|e| Error::new(ErrorKind::Other, format!("An error occurred while installing dependencies: {}", e)))?;
 
+    println!("Project generated successfully");
     Ok(())
 }
