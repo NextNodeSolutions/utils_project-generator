@@ -41,3 +41,10 @@ pub fn prompt_for_variable(variable_name: &str) -> Option<String> {
         _ => Text::new(&prompt).prompt().ok(),
     }
 }
+
+pub fn prompt_for_repo_name() -> Option<String> {
+    Text::new("Enter the name for the new GitHub repository:")
+        .with_validator(validation::validate_project_name)
+        .prompt()
+        .ok()
+}

@@ -11,6 +11,8 @@ use crate::generate::project_generator;
 use crate::template::TemplateManager;
 use crate::utils::{context, strings};
 
+pub use functions::prompt_for_repo_name;
+
 pub fn get_template_info(
     args: &Args,
     template_manager: &TemplateManager,
@@ -94,5 +96,6 @@ pub fn interact(template_path: &Path) -> Result<()> {
     project_generator::install_dependencies(&project_path)
         .with_context(|| "An error occurred while installing dependencies")?;
 
+    println!("Project generated successfully");
     Ok(())
 }

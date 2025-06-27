@@ -1,20 +1,18 @@
 use git2::{Repository, Signature};
-use octocrab::Octocrab;
-use std::fs;
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, ACCEPT};
+use serde_json::json;
 use std::path::Path;
+use crate::config::REPO_URL;
 
 pub struct GitHubRepo {
-    octocrab: Octocrab,
+    token: String,
 }
 
 impl GitHubRepo {
     pub fn new(token: &str) -> Self {
-        let octocrab = Octocrab::builder()
-            .personal_token(token.to_string())
-            .build()
-            .expect("Failed to create Octocrab instance");
-
-        Self { octocrab }
+        Self { 
+            token: token.to_string() 
+        }
     }
 
     pub async fn create_repository(
@@ -22,17 +20,60 @@ impl GitHubRepo {
         name: &str,
         description: &str,
         private: bool,
-    ) -> Result<String, Box<dyn std::error::Error>> {
-        let repo = self
-            .octocrab
-            .repos()
-            .create(name)
-            .description(description)
-            .private(private)
-            .send()
-            .await?;
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        // Extract organization from REPO_URL constant
+        // REPO_URL = "https://github.com/NextNodeSolutions"
+        let org_name = REPO_URL
+            .split('/')
+            .last()
+            .ok_or("Could not extract organization from REPO_URL")?;
+        
+        // Build headers
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", self.token))
+                .map_err(|_| "Failed to create authorization header")?,
+        );
+        headers.insert(
+            ACCEPT,
+            HeaderValue::from_str("application/vnd.github.v3+json")
+                .map_err(|_| "Failed to create accept header")?,
+        );
 
-        Ok(repo.html_url.unwrap_or_default())
+        // Build request body
+        let body = json!({
+            "name": name,
+            "description": description,
+            "private": private,
+            "auto_init": false
+        });
+
+        // Make GitHub API call
+        let client = reqwest::Client::new();
+        let response = client
+            .post(&format!("https://api.github.com/orgs/{}/repos", org_name))
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to send request to GitHub API: {}", e))?;
+
+        if !response.status().is_success() {
+            let error = response.text().await
+                .map_err(|e| format!("Failed to read error response: {}", e))?;
+            return Err(format!("GitHub API error: {}", error).into());
+        }
+
+        let repo_data: serde_json::Value = response.json().await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+        
+        let repo_url = repo_data["html_url"]
+            .as_str()
+            .ok_or("No html_url in response")?
+            .to_string();
+
+        Ok(repo_url)
     }
 
     pub fn initialize_and_push(
@@ -41,7 +82,7 @@ impl GitHubRepo {
         repo_url: &str,
         author_name: &str,
         author_email: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let repo = Repository::init(local_path)?;
 
         // Add all files

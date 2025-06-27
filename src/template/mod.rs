@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::config::{TEMPLATE_CATEGORIES, TEMPLATE_REPO_URL};
+use crate::config::{REPO_URL, TEMPLATE_REPO_URL, TEMPLATE_CATEGORIES};
 
 pub struct TemplateManager {
     repo_path: PathBuf,
@@ -38,7 +38,7 @@ impl TemplateManager {
         let mut builder = git2::build::RepoBuilder::new();
         builder.fetch_options(fetch_options);
 
-        builder.clone(TEMPLATE_REPO_URL, &repo_path).map_err(|e| {
+        builder.clone(format!("{}{}", REPO_URL, TEMPLATE_REPO_URL).as_str(), &repo_path).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to clone repository: {}", e),
