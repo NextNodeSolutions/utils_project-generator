@@ -1,6 +1,6 @@
 pub mod repo;
 
-use anyhow::Result;
+use std::io::{Error, ErrorKind, Result};
 use crate::config::REPO_URL;
 
 pub fn extract_organization_from_repo_url() -> Result<String> {
@@ -9,7 +9,7 @@ pub fn extract_organization_from_repo_url() -> Result<String> {
     let org_name = REPO_URL
         .split('/')
         .last()
-        .ok_or_else(|| anyhow::anyhow!("Could not extract organization from REPO_URL"))?;
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Could not extract organization from REPO_URL"))?;
     
     Ok(org_name.to_string())
 }
@@ -26,7 +26,7 @@ pub async fn create_github_repository_with_code(
     let repo_url = github_repo
         .create_repository(repo_name, description, false)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to create GitHub repository: {}", e))?;
+        .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to create GitHub repository: {}", e)))?;
     
     println!("Created GitHub repository: {}", repo_url);
     
@@ -38,7 +38,7 @@ pub async fn create_github_repository_with_code(
             "Project Generator",
             "generator@nextnode.dev",
         )
-        .map_err(|e| anyhow::anyhow!("Failed to initialize and push to GitHub: {}", e))?;
+        .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to initialize and push to GitHub: {}", e)))?;
     
     println!("Successfully pushed generated code to GitHub repository!");
     Ok(())

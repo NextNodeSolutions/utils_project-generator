@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use std::io::{Error, ErrorKind, Result};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -58,14 +58,14 @@ impl FileConfig {
 
 pub fn from_file<P: AsRef<Path>>(path: P) -> Result<FileConfig> {
     let content = fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Failed to read config file: {}", path.as_ref().display()))?;
+        .map_err(|e| Error::new(ErrorKind::InvalidData, format!("Failed to read config file: {}", e)))?;
 
     // Try YAML first, then JSON
     if let Ok(config) = serde_yaml::from_str(&content) {
         Ok(config)
     } else {
         let config: FileConfig = serde_json::from_str(&content)
-            .with_context(|| format!("Failed to parse config file: {}", path.as_ref().display()))?;
+            .map_err(|e| Error::new(ErrorKind::InvalidData, format!("Failed to parse config file: {}", e)))?;
         Ok(config)
     }
 }

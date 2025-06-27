@@ -1,4 +1,4 @@
-use anyhow::Result;
+use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 
 pub mod file_operations;
@@ -11,7 +11,7 @@ pub fn handle_interactive_mode(template_path: &Path) -> Result<()> {
             println!("Project generated successfully");
             Ok(())
         }
-        Err(e) => Err(anyhow::anyhow!("{}", e)),
+        Err(e) => Err(Error::new(ErrorKind::Other, e.to_string())),
     }
 }
 
@@ -27,10 +27,10 @@ pub fn handle_config_mode(template_path: &Path, project_name: &str) -> Result<()
     );
 
     project_generator::generate_project(&template_path, &project_path)
-        .map_err(|e| anyhow::anyhow!("An error occurred while generating the project: {}", e))?;
+        .map_err(|e| Error::new(ErrorKind::Other, format!("An error occurred while generating the project: {}", e)))?;
 
     project_generator::install_dependencies(&project_path)
-        .map_err(|e| anyhow::anyhow!("An error occurred while installing dependencies: {}", e))?;
+        .map_err(|e| Error::new(ErrorKind::Other, format!("An error occurred while installing dependencies: {}", e)))?;
 
     println!("Project generated successfully");
     Ok(())

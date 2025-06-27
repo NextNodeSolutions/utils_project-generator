@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config::{REPO_URL, TEMPLATE_REPO_URL, TEMPLATE_CATEGORIES};
 
@@ -9,11 +10,17 @@ pub struct TemplateManager {
 
 impl TemplateManager {
     pub fn new() -> std::io::Result<Self> {
-        let repo_path = tempfile::Builder::new()
-            .prefix("project-templates-")
-            .tempdir()?
-            .path()
-            .to_path_buf();
+        // Create a unique temporary directory using timestamp
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        
+        let temp_dir = std::env::temp_dir()
+            .join(format!("project-templates-{}", timestamp));
+        
+        fs::create_dir_all(&temp_dir)?;
+        let repo_path = temp_dir;
 
         // Configure Git to use HTTPS with PAT
         let mut callbacks = git2::RemoteCallbacks::new();
