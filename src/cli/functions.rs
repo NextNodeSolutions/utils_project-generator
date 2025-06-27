@@ -1,4 +1,4 @@
-use inquire::Text;
+use inquire::{Text, Confirm};
 
 use crate::utils::validation;
 
@@ -42,9 +42,20 @@ pub fn prompt_for_variable(variable_name: &str) -> Option<String> {
     }
 }
 
-pub fn prompt_for_repo_name() -> Option<String> {
-    Text::new("Enter the name for the new GitHub repository:")
-        .with_validator(validation::validate_project_name)
+pub fn prompt_for_repo_name(project_name: &str) -> Option<String> {
+    println!("Project name: {}", project_name);
+    
+    let use_project_name = Confirm::new("Do you want to use the project name as the repository name?")
+        .with_default(true)
         .prompt()
-        .ok()
+        .ok()?;
+    
+    if use_project_name {
+        Some(project_name.to_string())
+    } else {
+        Text::new("Enter the name for the new GitHub repository:")
+            .with_validator(validation::validate_project_name)
+            .prompt()
+            .ok()
+    }
 }

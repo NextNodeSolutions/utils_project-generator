@@ -20,6 +20,10 @@ pub fn handle_config_mode(template_path: &Path, project_name: &str) -> Result<()
         .join(crate::config::CREATION_PATH)
         .join(project_name);
 
+    handle_config_mode_with_path(template_path, project_name, &project_path)
+}
+
+pub fn handle_config_mode_with_path(template_path: &Path, project_name: &str, project_path: &Path) -> Result<()> {
     println!(
         "Generating project '{}' with template '{}'",
         project_name,
@@ -31,6 +35,20 @@ pub fn handle_config_mode(template_path: &Path, project_name: &str) -> Result<()
 
     project_generator::install_dependencies(&project_path)
         .map_err(|e| Error::new(ErrorKind::Other, format!("An error occurred while installing dependencies: {}", e)))?;
+
+    println!("Project generated successfully");
+    Ok(())
+}
+
+pub fn handle_config_mode_with_path_no_deps(template_path: &Path, project_name: &str, project_path: &Path) -> Result<()> {
+    println!(
+        "Generating project '{}' with template '{}'",
+        project_name,
+        template_path.display()
+    );
+
+    project_generator::generate_project(&template_path, &project_path)
+        .map_err(|e| Error::new(ErrorKind::Other, format!("An error occurred while generating the project: {}", e)))?;
 
     println!("Project generated successfully");
     Ok(())

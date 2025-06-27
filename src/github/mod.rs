@@ -30,9 +30,9 @@ pub async fn create_github_repository_with_code(
     
     println!("Created GitHub repository: {}", repo_url);
     
-    // Initialize git and push the generated code
+    // Initialize git and push the generated code (includes pnpm install results)
     github_repo
-        .initialize_and_push(
+        .initialize_git_and_push(
             project_path,
             &repo_url,
             "Project Generator",

@@ -12,7 +12,6 @@ use clap::Parser;
 use cli::{get_template_info, prompt_for_repo_name};
 use generate::{handle_config_mode, handle_interactive_mode};
 use github::{create_github_repository_with_code, extract_organization_from_repo_url};
-use std::path::PathBuf;
 use template::TemplateManager;
 
 #[tokio::main]
@@ -47,11 +46,7 @@ async fn main() -> Result<()> {
         let organization = extract_organization_from_repo_url()?;
         println!("Using organization: {}", organization);
 
-        // Ask for repository name
-        let repo_name = prompt_for_repo_name()
-            .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Repository name is required"))?;
-
-        // Generate project locally
+        // Generate project locally first to get project name
         let project_name = if let Some(config_path) = &args.config {
             // Config mode
             let config_content = std::fs::read_to_string(config_path)
@@ -71,16 +66,26 @@ async fn main() -> Result<()> {
             return Err(Error::new(ErrorKind::InvalidInput, "Config file is required for remote mode. Use --config to specify a config file."));
         };
 
-        let project_path = PathBuf::from(&project_name);
+        // Ask for repository name with option to use project name
+        let repo_name = prompt_for_repo_name(&project_name)
+            .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Repository name is required"))?;
 
-        // Generate the project
+        // Create temporary directory for remote mode
+        let temp_dir = std::env::temp_dir().join(format!("project-generator-{}", project_name));
+        let project_path = temp_dir;
+
+        // Generate the project in temp directory
         if args.config.is_some() {
-            handle_config_mode(&template_path, &project_name)
+            crate::generate::handle_config_mode_with_path_no_deps(&template_path, &project_name, &project_path)
                 .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
         } else {
             handle_interactive_mode(&template_path)
                 .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
         }
+
+        // Install dependencies AFTER copying template files but BEFORE Git operations
+        crate::generate::project_generator::install_dependencies(&project_path)
+            .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to install dependencies: {}", e)))?;
 
         // Get description from config or use default
         let description = if let Some(config_path) = &args.config {
@@ -98,7 +103,7 @@ async fn main() -> Result<()> {
             "Generated project".to_string()
         };
 
-        // Create GitHub repository with the generated code
+        // Create GitHub repository and push the code (includes full Git workflow)
         create_github_repository_with_code(&token, &repo_name, &project_path, &description).await?;
 
         return Ok(());
