@@ -244,6 +244,9 @@ cargo run -- --debug --category packages --template library
 - `packages`: NPM libraries and packages  
 - `utils`: Development utilities and tools
 
+**Templates Repository:**
+You can find all available templates at: https://github.com/NextNodeSolutions/utils_project-templates
+
 **Template structure:**
 ```
 templates/
