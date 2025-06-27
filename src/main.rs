@@ -87,7 +87,7 @@ async fn main() -> Result<()> {
 
     // Generate the project in temp directory
     if args.config.is_some() {
-        crate::generate::handle_config_mode_with_path_no_deps(&template_path, &project_name, &project_path)
+        crate::generate::handle_config_mode_with_path(&template_path, &project_name, &project_path, false)
             .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
     } else {
         handle_interactive_mode(&template_path)
@@ -105,7 +105,15 @@ async fn main() -> Result<()> {
         .to_string();
 
     // Create GitHub repository and push the code (includes full Git workflow)
-    create_github_repository_with_code(&token, &repo_name, &project_path, &description).await?;
+    let result = create_github_repository_with_code(&token, &repo_name, &project_path, &description).await;
 
+    // Clean up temporary directory
+    if let Err(e) = std::fs::remove_dir_all(&project_path) {
+        eprintln!("Warning: Failed to clean up temporary directory '{}': {}", project_path.display(), e);
+    } else {
+        println!("Temporary directory cleaned up successfully");
+    }
+
+    result?;
     Ok(())
 }
