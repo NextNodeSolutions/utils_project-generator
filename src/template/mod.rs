@@ -2,14 +2,14 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::config::{REPO_URL, TEMPLATE_REPO_URL, TEMPLATE_CATEGORIES};
+use crate::config::{REPO_URL, TEMPLATE_REPO_URL, TEMPLATE_BRANCH, TEMPLATE_CATEGORIES};
 
 pub struct TemplateManager {
     repo_path: PathBuf,
 }
 
 impl TemplateManager {
-    pub fn new() -> std::io::Result<Self> {
+    pub fn new(branch: Option<&str>) -> std::io::Result<Self> {
         // Create a unique temporary directory using timestamp
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -44,6 +44,10 @@ impl TemplateManager {
         // Clone the repository
         let mut builder = git2::build::RepoBuilder::new();
         builder.fetch_options(fetch_options);
+        
+        // Use provided branch or fallback to TEMPLATE_BRANCH constant
+        let branch_to_use = branch.unwrap_or(TEMPLATE_BRANCH);
+        builder.branch(branch_to_use);
 
         builder.clone(format!("{}{}", REPO_URL, TEMPLATE_REPO_URL).as_str(), &repo_path).map_err(|e| {
             std::io::Error::new(

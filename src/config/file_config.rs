@@ -14,6 +14,8 @@ pub struct FileConfig {
     pub template_category: Option<String>,
     #[serde(default)]
     pub template_name: Option<String>,
+    #[serde(default)]
+    pub template_branch: Option<String>,
     #[serde(flatten)]
     pub additional_vars: std::collections::HashMap<String, String>,
 }
@@ -30,6 +32,10 @@ impl FileConfig {
                 None
             }
         }
+    }
+
+    pub fn get_template_branch(&self) -> &str {
+        self.template_branch.as_deref().unwrap_or("main")
     }
 
     pub fn to_variables(&self) -> std::collections::HashMap<String, String> {

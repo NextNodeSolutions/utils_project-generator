@@ -6,4 +6,5 @@ keywords: "nextnode,utils,toolkit,development,automation"
 license: "Apache-2.0"
 version: "0.1.0"
 template_category: "packages"
-template_name: "library" 
+template_name: "library"
+# template_branch: "develop"  # Optional: specify which branch to use for templates (default: "main") 

@@ -21,8 +21,16 @@ async fn main() -> Result<()> {
     // Set debug mode in the global context
     utils::context::set_debug_mode(args.debug);
 
+    // Get template branch from config if available
+    let template_branch = if let Some(config_path) = &args.config {
+        let config = crate::config::file_config::from_file(config_path).ok();
+        config.as_ref().map(|c| c.get_template_branch()).map(|s| s.to_string())
+    } else {
+        None
+    };
+
     // Initialize template manager and clone the repository
-    let template_manager = TemplateManager::new().unwrap_or_else(|err| {
+    let template_manager = TemplateManager::new(template_branch.as_deref()).unwrap_or_else(|err| {
         utils::error::print_error_and_exit_with_error("Failed to initialize template manager", &err)
     });
 
