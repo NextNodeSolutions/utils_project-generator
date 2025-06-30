@@ -1,10 +1,27 @@
-project_name: "nextnode-utils"
-name: "@nextnode/utils"
-description: "A powerful utility toolkit for Nextnode development"
-author: "Nextnode Team"
-keywords: "nextnode,utils,toolkit,development,automation"
-license: "Apache-2.0"
-version: "0.1.0"
-template_category: "packages"
-template_name: "library"
-# template_branch: "develop"  # Optional: specify which branch to use for templates (default: "main") 
+# Example configuration file for project generator
+# This file demonstrates all available configuration options
+
+# Required configuration
+project_name: "my-awesome-project"         # Project name (used for folder)
+name: "@myorg/my-awesome-project"         # Package name (for package.json, etc.)
+description: "Description of my project"  # GitHub repository description
+
+# Template configuration
+template_category: "apps"                  # Category: "apps", "packages", or "utils"
+template_name: "nextjs-app"               # Specific template name
+template_branch: "main"                   # Optional: specific branch to use (default: "main")
+
+# GitHub configuration (only used in --remote mode)
+github_tag: "apps"                        # Optional: Adds a topic to the GitHub repository.
+                                          # Must be one of: "apps", "packages", "utils"
+                                          # Topics appear under the repository name for categorization
+                                          # If invalid, generation stops before pulling code
+
+# Additional variables (optional, depends on template)
+author: "My Name"
+license: "MIT"
+version: "1.0.0"
+keywords: "nextjs,react,webapp"
+
+# Any additional custom variables can be added here
+# They will be available for replacement in template files as {{variable_name}} 

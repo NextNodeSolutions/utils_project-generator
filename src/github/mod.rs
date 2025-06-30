@@ -19,12 +19,13 @@ pub async fn create_github_repository_with_code(
     repo_name: &str,
     project_path: &std::path::Path,
     description: &str,
+    github_tag: Option<&str>,
 ) -> Result<()> {
     let github_repo = repo::GitHubRepo::new(token);
     
-    // Create the repository
+    // Create the repository (with topic if provided)
     let repo_url = github_repo
-        .create_repository(repo_name, description, false)
+        .create_repository(repo_name, description, false, github_tag)
         .await
         .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to create GitHub repository: {}", e)))?;
     
@@ -41,5 +42,6 @@ pub async fn create_github_repository_with_code(
         .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to initialize and push to GitHub: {}", e)))?;
     
     println!("Successfully pushed generated code to GitHub repository!");
+    
     Ok(())
 } 

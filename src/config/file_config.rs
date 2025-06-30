@@ -16,6 +16,8 @@ pub struct FileConfig {
     pub template_name: Option<String>,
     #[serde(default)]
     pub template_branch: Option<String>,
+    #[serde(default)]
+    pub github_tag: Option<String>,
     #[serde(flatten)]
     pub additional_vars: std::collections::HashMap<String, String>,
 }
@@ -36,6 +38,27 @@ impl FileConfig {
 
     pub fn get_template_branch(&self) -> &str {
         self.template_branch.as_deref().unwrap_or("main")
+    }
+
+    pub fn get_github_tag(&self) -> Option<&String> {
+        self.github_tag.as_ref()
+    }
+
+    pub fn validate_github_tag(&self) -> Result<()> {
+        if let Some(tag) = &self.github_tag {
+            let valid_tags = ["apps", "packages", "utils"];
+            if !valid_tags.contains(&tag.as_str()) {
+                let error_msg = format!(
+                    "Invalid github_tag '{}'. Allowed values are: {}",
+                    tag,
+                    valid_tags.join(", ")
+                );
+                context::debug_print(&format!("ERROR: {}", error_msg));
+                return Err(Error::new(ErrorKind::InvalidData, error_msg));
+            }
+            context::debug_print(&format!("Valid github_tag found: '{}'", tag));
+        }
+        Ok(())
     }
 
     pub fn to_variables(&self) -> std::collections::HashMap<String, String> {

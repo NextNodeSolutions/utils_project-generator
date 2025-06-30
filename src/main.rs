@@ -69,17 +69,18 @@ async fn main() -> Result<()> {
         Error::new(ErrorKind::InvalidInput, "Config file is required for remote mode. Use --config to specify a config file.")
     })?;
 
-    // Read and parse config file early to get project name
-    let config_content = std::fs::read_to_string(config_path)
+    // Read and parse config file early to get project name and validate github_tag
+    let file_config = crate::config::file_config::from_file(config_path)
         .map_err(|e| Error::new(ErrorKind::InvalidData, format!("Failed to read config file: {}", e)))?;
     
-    let config: serde_yaml::Value = serde_yaml::from_str(&config_content)
-        .map_err(|e| Error::new(ErrorKind::InvalidData, format!("Failed to parse config file: {}", e)))?;
+    // Validate github_tag early (before pulling code)
+    file_config.validate_github_tag()
+        .map_err(|e| Error::new(ErrorKind::InvalidData, format!("GitHub tag validation failed: {}", e)))?;
     
-    let project_name = config["project_name"]
-        .as_str()
-        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "project_name is required in config file"))?
-        .to_string();
+    let project_name = file_config.project_name.clone();
+    if project_name.is_empty() {
+        return Err(Error::new(ErrorKind::InvalidData, "project_name is required in config file"));
+    }
 
     // Get organization from REPO_URL
     let organization = extract_organization_from_repo_url()?;
@@ -107,13 +108,14 @@ async fn main() -> Result<()> {
         .map_err(|e| Error::new(ErrorKind::Other, format!("Failed to install dependencies: {}", e)))?;
 
     // Get description from config or use default
-    let description = config["description"]
-        .as_str()
-        .unwrap_or("Generated project")
-        .to_string();
+    let description = file_config.additional_vars
+        .get("description")
+        .cloned()
+        .unwrap_or_else(|| "Generated project".to_string());
 
     // Create GitHub repository and push the code (includes full Git workflow)
-    let result = create_github_repository_with_code(&token, &repo_name, &project_path, &description).await;
+    let github_tag = file_config.get_github_tag().map(|s| s.as_str());
+    let result = create_github_repository_with_code(&token, &repo_name, &project_path, &description, github_tag).await;
 
     // Clean up temporary directory
     if let Err(e) = std::fs::remove_dir_all(&project_path) {
