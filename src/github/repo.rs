@@ -20,6 +20,7 @@ impl GitHubRepo {
         name: &str,
         description: &str,
         private: bool,
+        topic: Option<&str>,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         // Extract organization from REPO_URL constant
         // REPO_URL = "https://github.com/NextNodeSolutions"
@@ -54,11 +55,11 @@ impl GitHubRepo {
             "auto_init": false
         });
 
-        // Make GitHub API call
+        // Make GitHub API call to create repository
         let client = reqwest::Client::new();
         let response = client
             .post(&format!("https://api.github.com/orgs/{}/repos", org_name))
-            .headers(headers)
+            .headers(headers.clone())
             .json(&body)
             .send()
             .await
@@ -77,6 +78,32 @@ impl GitHubRepo {
             .as_str()
             .ok_or("No html_url in response")?
             .to_string();
+
+        // Add topic if provided
+        if let Some(topic_name) = topic {
+            println!("Adding topic '{}' to repository...", topic_name);
+            
+            let topics_body = json!({
+                "names": [topic_name]
+            });
+
+            let topics_response = client
+                .put(&format!("https://api.github.com/repos/{}/{}/topics", org_name, name))
+                .headers(headers)
+                .json(&topics_body)
+                .send()
+                .await
+                .map_err(|e| format!("Failed to add topic: {}", e))?;
+
+            if !topics_response.status().is_success() {
+                let error = topics_response.text().await
+                    .map_err(|e| format!("Failed to read topics error response: {}", e))?;
+                // Don't fail the entire operation for topic addition failure, just warn
+                eprintln!("Warning: Failed to add topic '{}': {}", topic_name, error);
+            } else {
+                println!("Successfully added topic '{}' to repository", topic_name);
+            }
+        }
 
         Ok(repo_url)
     }
