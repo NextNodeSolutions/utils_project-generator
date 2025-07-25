@@ -164,4 +164,369 @@ impl GitHubRepo {
 
         Ok(())
     }
+
+    pub async fn trigger_workflow_dispatch(
+        &self,
+        repo_name: &str,
+        workflow_file: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Extract organization from REPO_URL constant
+        let org_name = REPO_URL
+            .split('/')
+            .last()
+            .ok_or("Could not extract organization from REPO_URL")?;
+
+        // Build headers
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", self.token))
+                .map_err(|_| "Failed to create authorization header")?,
+        );
+        headers.insert(
+            ACCEPT,
+            HeaderValue::from_str("application/vnd.github.v3+json")
+                .map_err(|_| "Failed to create accept header")?,
+        );
+        headers.insert(
+            USER_AGENT,
+            HeaderValue::from_str("NextNode-Project-Generator/1.0")
+                .map_err(|_| "Failed to create user-agent header")?,
+        );
+
+        // Build request body for workflow dispatch
+        let body = json!({
+            "ref": "main"
+        });
+
+        // Make GitHub API call to trigger workflow
+        let client = reqwest::Client::new();
+        let response = client
+            .post(&format!(
+                "https://api.github.com/repos/{}/{}/actions/workflows/{}/dispatches",
+                org_name, repo_name, workflow_file
+            ))
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to trigger workflow {}: {}", workflow_file, e))?;
+
+        if !response.status().is_success() {
+            let error = response.text().await
+                .map_err(|e| format!("Failed to read error response: {}", e))?;
+            return Err(format!("GitHub API error for workflow {}: {}", workflow_file, error).into());
+        }
+
+        println!("✅ Successfully triggered workflow: {}", workflow_file);
+        Ok(())
+    }
+
+    pub async fn trigger_deployments(
+        &self,
+        repo_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        println!("🚀 Triggering deployment workflows...");
+        
+        // Wait a bit for the repository to be fully initialized
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+        // Trigger dev deployment
+        match self.trigger_workflow_dispatch(repo_name, "deploy-dev.yml").await {
+            Ok(_) => println!("✅ Dev deployment workflow triggered"),
+            Err(e) => eprintln!("⚠️  Warning: Failed to trigger dev deployment: {}", e),
+        }
+
+        // Wait between requests to avoid rate limiting
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        // Trigger prod deployment
+        match self.trigger_workflow_dispatch(repo_name, "deploy-prod.yml").await {
+            Ok(_) => println!("✅ Production deployment workflow triggered"),
+            Err(e) => eprintln!("⚠️  Warning: Failed to trigger prod deployment: {}", e),
+        }
+
+        println!("🎉 Deployment workflows have been triggered! Check GitHub Actions for status.");
+        Ok(())
+    }
+
+    pub async fn create_develop_branch(
+        &self,
+        repo_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Extract organization from REPO_URL constant
+        let org_name = REPO_URL
+            .split('/')
+            .last()
+            .ok_or("Could not extract organization from REPO_URL")?;
+
+        // Build headers
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", self.token))
+                .map_err(|_| "Failed to create authorization header")?,
+        );
+        headers.insert(
+            ACCEPT,
+            HeaderValue::from_str("application/vnd.github.v3+json")
+                .map_err(|_| "Failed to create accept header")?,
+        );
+        headers.insert(
+            USER_AGENT,
+            HeaderValue::from_str("NextNode-Project-Generator/1.0")
+                .map_err(|_| "Failed to create user-agent header")?,
+        );
+
+        let client = reqwest::Client::new();
+
+        // First, get the SHA of the main branch
+        let main_ref_response = client
+            .get(&format!(
+                "https://api.github.com/repos/{}/{}/git/refs/heads/main",
+                org_name, repo_name
+            ))
+            .headers(headers.clone())
+            .send()
+            .await
+            .map_err(|e| format!("Failed to get main branch SHA: {}", e))?;
+
+        if !main_ref_response.status().is_success() {
+            let error = main_ref_response.text().await
+                .map_err(|e| format!("Failed to read error response: {}", e))?;
+            return Err(format!("GitHub API error getting main branch: {}", error).into());
+        }
+
+        let main_ref_data: serde_json::Value = main_ref_response.json().await
+            .map_err(|e| format!("Failed to parse main branch response: {}", e))?;
+
+        let main_sha = main_ref_data["object"]["sha"]
+            .as_str()
+            .ok_or("No SHA found in main branch response")?;
+
+        println!("📋 Main branch SHA: {}", main_sha);
+
+        // Check if develop branch already exists
+        let develop_check_response = client
+            .get(&format!(
+                "https://api.github.com/repos/{}/{}/git/refs/heads/develop",
+                org_name, repo_name
+            ))
+            .headers(headers.clone())
+            .send()
+            .await;
+
+        if let Ok(response) = develop_check_response {
+            if response.status().is_success() {
+                println!("ℹ️  Develop branch already exists, skipping creation");
+                return Ok(());
+            }
+        }
+
+        // Create develop branch from main SHA
+        let create_branch_body = json!({
+            "ref": "refs/heads/develop",
+            "sha": main_sha
+        });
+
+        let create_response = client
+            .post(&format!(
+                "https://api.github.com/repos/{}/{}/git/refs",
+                org_name, repo_name
+            ))
+            .headers(headers)
+            .json(&create_branch_body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to create develop branch: {}", e))?;
+
+        if !create_response.status().is_success() {
+            let error = create_response.text().await
+                .map_err(|e| format!("Failed to read error response: {}", e))?;
+            return Err(format!("GitHub API error creating develop branch: {}", error).into());
+        }
+
+        println!("✅ Successfully created develop branch from main");
+        Ok(())
+    }
+
+    pub async fn setup_branch_protection_main(
+        &self,
+        repo_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Extract organization from REPO_URL constant
+        let org_name = REPO_URL
+            .split('/')
+            .last()
+            .ok_or("Could not extract organization from REPO_URL")?;
+
+        // Build headers
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", self.token))
+                .map_err(|_| "Failed to create authorization header")?,
+        );
+        headers.insert(
+            ACCEPT,
+            HeaderValue::from_str("application/vnd.github.v3+json")
+                .map_err(|_| "Failed to create accept header")?,
+        );
+        headers.insert(
+            USER_AGENT,
+            HeaderValue::from_str("NextNode-Project-Generator/1.0")
+                .map_err(|_| "Failed to create user-agent header")?,
+        );
+
+        // Build branch protection body for main (strict)
+        let protection_body = json!({
+            "required_status_checks": {
+                "strict": true,
+                "contexts": ["quality-checks"]
+            },
+            "required_pull_request_reviews": {
+                "required_approving_review_count": 1,
+                "dismiss_stale_reviews": true,
+                "require_code_owner_reviews": false
+            },
+            "required_conversation_resolution": true,
+            "required_linear_history": true,
+            "enforce_admins": false,
+            "restrictions": null
+        });
+
+        let client = reqwest::Client::new();
+        let response = client
+            .put(&format!(
+                "https://api.github.com/repos/{}/{}/branches/main/protection",
+                org_name, repo_name
+            ))
+            .headers(headers)
+            .json(&protection_body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to set main branch protection: {}", e))?;
+
+        if !response.status().is_success() {
+            let error = response.text().await
+                .map_err(|e| format!("Failed to read error response: {}", e))?;
+            return Err(format!("GitHub API error setting main branch protection: {}", error).into());
+        }
+
+        println!("🔒 Successfully set up branch protection for main (strict: PR required, quality-checks, conversation resolution, linear history)");
+        Ok(())
+    }
+
+    pub async fn setup_branch_protection_develop(
+        &self,
+        repo_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Extract organization from REPO_URL constant
+        let org_name = REPO_URL
+            .split('/')
+            .last()
+            .ok_or("Could not extract organization from REPO_URL")?;
+
+        // Build headers
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {}", self.token))
+                .map_err(|_| "Failed to create authorization header")?,
+        );
+        headers.insert(
+            ACCEPT,
+            HeaderValue::from_str("application/vnd.github.v3+json")
+                .map_err(|_| "Failed to create accept header")?,
+        );
+        headers.insert(
+            USER_AGENT,
+            HeaderValue::from_str("NextNode-Project-Generator/1.0")
+                .map_err(|_| "Failed to create user-agent header")?,
+        );
+
+        // Build branch protection body for develop (lighter - no PR required)
+        let protection_body = json!({
+            "required_status_checks": {
+                "strict": true,
+                "contexts": ["quality-checks"]
+            },
+            "required_pull_request_reviews": null,
+            "required_conversation_resolution": true,
+            "required_linear_history": true,
+            "enforce_admins": false,
+            "restrictions": null
+        });
+
+        let client = reqwest::Client::new();
+        let response = client
+            .put(&format!(
+                "https://api.github.com/repos/{}/{}/branches/develop/protection",
+                org_name, repo_name
+            ))
+            .headers(headers)
+            .json(&protection_body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to set develop branch protection: {}", e))?;
+
+        if !response.status().is_success() {
+            let error = response.text().await
+                .map_err(|e| format!("Failed to read error response: {}", e))?;
+            return Err(format!("GitHub API error setting develop branch protection: {}", error).into());
+        }
+
+        println!("🔒 Successfully set up branch protection for develop (light: no PR required, quality-checks, conversation resolution, linear history)");
+        Ok(())
+    }
+
+    pub async fn setup_repository_branches_and_protection(
+        &self,
+        repo_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        println!("🔧 Setting up repository branches and protection rules...");
+        
+        // Wait a bit for the repository to be fully initialized after push
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+        // Step 1: Create develop branch from main
+        match self.create_develop_branch(repo_name).await {
+            Ok(_) => println!("✅ Develop branch setup completed"),
+            Err(e) => {
+                eprintln!("⚠️  Warning: Failed to create develop branch: {}", e);
+                eprintln!("   Continuing with branch protection setup...");
+            }
+        }
+
+        // Wait between API calls to avoid rate limiting
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        // Step 2: Set up branch protection for main (strict)
+        match self.setup_branch_protection_main(repo_name).await {
+            Ok(_) => println!("✅ Main branch protection setup completed"),
+            Err(e) => {
+                eprintln!("⚠️  Warning: Failed to set up main branch protection: {}", e);
+                eprintln!("   You may need to configure branch protection manually in GitHub settings");
+            }
+        }
+
+        // Wait between API calls to avoid rate limiting
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        // Step 3: Set up branch protection for develop (light)
+        match self.setup_branch_protection_develop(repo_name).await {
+            Ok(_) => println!("✅ Develop branch protection setup completed"),
+            Err(e) => {
+                eprintln!("⚠️  Warning: Failed to set up develop branch protection: {}", e);
+                eprintln!("   You may need to configure branch protection manually in GitHub settings");
+            }
+        }
+
+        println!("🎉 Repository branch setup completed!");
+        println!("📋 Summary:");
+        println!("   • main branch: Protected (PR required, quality-checks, conversation resolution, linear history)");
+        println!("   • develop branch: Protected (direct push allowed, quality-checks, conversation resolution, linear history)");
+        
+        Ok(())
+    }
 }
